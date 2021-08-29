@@ -1,36 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+  name: foundationdb-bootstrap
+  labels:
+    app: foundationdb-bootstrap
+spec:
+  publishNotReadyAddresses: true
+  ports:
+  - port: 4500
+    name: foundationdb-bootstrap
+  selector:
+    app: foundationdb-bootstrap
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: foundationdb
+  name: foundationdb-bootstrap
 spec:
   selector:
     matchLabels:
-      app: foundationdb
-  serviceName: foundationdb
+      app: foundationdb-bootstrap
+  serviceName: foundationdb-bootstrap
+  replicas: 1
   template:
     metadata:
       labels:
-        app: foundationdb
+        app: foundationdb-bootstrap
     spec:
-      initContainers:
-      - name: copy-fdb-cluster
-        image: google/cloud-sdk
-        command: ["sh", "-c", "if [ $HOSTNAME != foundationdb-0 ]; then kubectl exec foundationdb-0 cat /var/lib/foundationdb/fdb.cluster | tee /fdb/fdb.cluster; fi"]
-        volumeMounts:
-        - name: var-lib-fdb
-          mountPath: "/fdb"
       containers:
-      - name: foundationdb
-        image: hiroshi3110/foundationdb:5.1.5-1_ubuntu-16.04
+      - name: foundationdb-bootstrap
+        image: langley/fdb:latest 
         imagePullPolicy: Always
-        command: ["/root/tini"]
-        args: ["--", "/root/start.sh"]
+        command: ["tini"]
+        args: ["--", "bash", "start.sh"]
         ports:
         - containerPort: 4500
           name: fdb
         volumeMounts:
-        - name: var-lib-fdb
-          mountPath: "/var/lib/foundationdb"
+        - name: etc-fdb
+          mountPath: "/etc/foundationdb"
+      imagePullSecrets:
+      - name: regcred
       volumes:
-      - name: var-lib-fdb
+      - name: etc-fdb
         emptyDir: {}
